@@ -7,126 +7,184 @@ output: pdf_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(dtplyr)
+library(rstanarm)
+library(ggplot2)
+#setwd("C:/BU Study/MA678/homework/MA678-HW5")
 ```
 
 ## 15.1 Poisson and negative binomial regression
-The folder `RiskyBehavior` contains data from a randomized trial targeting couples at high risk of HIV infection. The intervention provided counseling sessions regarding practices that could reduce their likelihood of contracting HIV. Couples were randomized either to a control group, a group in which just the woman participated, or a group in which both members of the couple participated. One of the outcomes examined after three months was "number of unprotected sex acts."  
 
-### a) 
-Model this outcome as a function of treatment assignment using a Poisson regression. Does the model fit well? Is there evidence of overdispersion?  
+The folder `RiskyBehavior` contains data from a randomized trial targeting couples at high risk of HIV infection. The intervention provided counseling sessions regarding practices that could reduce their likelihood of contracting HIV. Couples were randomized either to a control group, a group in which just the woman participated, or a group in which both members of the couple participated. One of the outcomes examined after three months was "number of unprotected sex acts."
 
-```{r}
-```
+### a)
 
-### b) 
-Next extend the model to include pre-treatment measures of the outcome and the additional pre-treatment variables included in the dataset. Does the model fit well? Is there evidence of overdispersion?  
+Model this outcome as a function of treatment assignment using a Poisson regression. Does the model fit well? Is there evidence of overdispersion?
 
 ```{r}
+risky <- read.csv("risky.csv", header = T)
+#create a new row called treatment. 3  = couple, 2 = women alone, 1 = education
+risky <- risky |>
+    mutate(treatment = ifelse(couples == 1, 3, ifelse(women_alone == 1, 2, 1))) |>
+    mutate(fupacts = round(fupacts))
+m <-  stan_glm(data = risky, fupacts~treatment, family = poisson(link="log"), refresh = 0)
+summary(m)
+pp_check(m)
 ```
 
-### c) 
+From the posterior predictive check plot, we can see our model predicts less 0s than the real data，so there might be 0 inflation.
+
+```{r}
+#Use reisidual plot to see the dispersion
+plot(fitted(m), resid(m), pch = 20, main = "Residual Plot")
+dispersiontest(m)
+```
+
+From the residual plot, we can see a huge amount of data points are above 0, which indicates that the it is overdispersion. Also, through the dispersion test, the result is 44 which is a large number indicating it's overdispersion.
+
+### b)
+
+Next extend the model to include pre-treatment measures of the outcome and the additional pre-treatment variables included in the dataset. Does the model fit well? Is there evidence of overdispersion?
+
+```{r}
+#indicators are treatment and bs_hiv
+m1 <- stan_glm(data = risky, fupacts~treatment+bs_hiv, family = poisson(link="log"), refresh = 0)
+summary(m1)
+pp_check(m1)
+```
+
+We can still observe our model create less 0s than the actual data.
+
+```{r}
+plot(fitted(m1), resid(m1), pch = 20, main = "Residual Plot")
+dispersiontest(m1)
+```
+
+From the dispersion test and residual plot, we can see it's still overdispersion since there are many points far away from 0.
+
+### c)
+
 Fit a negative binomial (overdispersed Poisson) model. What do you conclude regarding effectiveness of the intervention?
 
 ```{r}
+nb <- stan_glm(fupacts~treatment+bs_hiv, data = risky, 
+               family = neg_binomial_2(link = "log"), refresh = 0)
+summary(nb)
+pp_check(nb)
+exp(coef(nb)[2])
 ```
 
-### d) 
-These data include responses from both men and women from the participating couples. Does this give you any concern with regard to our modeling assumptions? 
+The model fits better, but the model contains more 0s than the real data.
 
-```{r}
-```
+The coefficient shows that if the treatment applied, unprotected sex will decrease by 8.2%.
 
+### d)
+
+These data include responses from both men and women from the participating couples. Does this give you any concern with regard to our modeling assumptions?
+
+I think the mode will fit better if the data specify the gender of the one who received education, with adding one more indicator we might be able to decrease the 0s in the predicting model.
 
 ## 15.3 Binomial regression
-Redo the basketball shooting example on page 270, making some changes:  
 
-### (a) 
-Instead of having each player shoot 20 times, let the number of shots per player vary, drawn from the uniform distribution between 10 and 30.  
-```{r}
-```
+Redo the basketball shooting example on page 270, making some changes:
 
-### (b) 
-Instead of having the true probability of success be linear, have the true probability be a logistic function, set so that Pr(success) = 0.3 for a player who is 5'9" and 0.4 for a 6' tall player. 
+### (a)
+
+Instead of having each player shoot 20 times, let the number of shots per player vary, drawn from the uniform distribution between 10 and 30.
 
 ```{r}
 ```
 
+### (b)
+
+Instead of having the true probability of success be linear, have the true probability be a logistic function, set so that Pr(success) = 0.3 for a player who is 5'9" and 0.4 for a 6' tall player.
+
+```{r}
+```
 
 ## 15.7 Tobit model for mixed discrete/continuous data
-Experimental data from the National Supported  Work example are in the folder `Lalonde`. Use the treatment indicator and pre-treatment variables to predict post-treatment (1978) earnings using a Tobit model. Interpret the model coefficients. 
+
+Experimental data from the National Supported Work example are in the folder `Lalonde`. Use the treatment indicator and pre-treatment variables to predict post-treatment (1978) earnings using a Tobit model. Interpret the model coefficients.
 
 ```{r}
 ```
-
 
 ## 15.8 Robust linear regression using the t model
-The folder `Congress` has the votes for the Democratic and Republican candidates in each U.S. congressional district in 1988, along with the parties' vote proportions in 1986 and an indicator for whether the incumbent was running for reelection in 1988. For your analysis, just use the elections that were contested by both parties in both years.  
+
+The folder `Congress` has the votes for the Democratic and Republican candidates in each U.S. congressional district in 1988, along with the parties' vote proportions in 1986 and an indicator for whether the incumbent was running for reelection in 1988. For your analysis, just use the elections that were contested by both parties in both years.
 
 ```{r}
 ```
 
-### (a) 
+### (a)
+
 Fit a linear regression using `stan_glm` with the usual normal-distribution model for the errors predicting 1988 Democratic vote share from the other variables and assess model fit.
 
 ```{r}
 ```
 
-### (b) 
-Fit the same sort of model using the `brms` package with a $t$ distribution, using the `brm` function with the student family. Again assess model fit.  
+### (b)
+
+Fit the same sort of model using the `brms` package with a $t$ distribution, using the `brm` function with the student family. Again assess model fit.
 
 ```{r}
 ```
 
-### (c) 
-Which model do you prefer? 
+### (c)
 
+Which model do you prefer?
 
 ## 15.9 Robust regression for binary data using the robit model
-Use the same data as the previous example with the goal instead of predicting for each district whether it was won by the Democratic or Republican candidate.  
 
-### (a) 
+Use the same data as the previous example with the goal instead of predicting for each district whether it was won by the Democratic or Republican candidate.
+
+### (a)
+
 Fit a standard logistic or probit regression and assess model fit.
 
 ```{r}
 ```
 
-### (b) 
+### (b)
+
 Fit a robit regression and assess model fit.
 
 ```{r}
 ```
 
-### (c) 
-Which model do you prefer? 
+### (c)
 
+Which model do you prefer?
 
 ## 15.14 Model checking for count data
-The folder `RiskyBehavior` contains data from a study of behavior of couples at risk for HIV; see Exercise 15.1. 
 
-### (a) 
+The folder `RiskyBehavior` contains data from a study of behavior of couples at risk for HIV; see Exercise 15.1.
+
+### (a)
+
 Fit a Poisson regression predicting number of unprotected sex acts from baseline HIV status. Perform predictive simulation to generate 1000 datasets and record the percentage of observations that are equal to 0 and the percentage that are greater than 10 (the third quartile in the observed data) for each. Compare these to the observed value in the original data.
 
 ```{r}
 ```
 
-### (b) 
+### (b)
+
 Repeat (a) using a negative binomial (overdispersed Poisson) regression.
 
 ```{r}
 ```
 
-### (c) 
+### (c)
+
 Repeat (b), also including ethnicity and baseline number of unprotected sex acts as inputs.
 
 ```{r}
 ```
 
-
 ## 15.15 Summarizing inferences and predictions using simulation
-Exercise 15.7 used a Tobit model to fit a regression with an outcome that had mixed discrete and continuous data. In this exercise you will revisit these data and build a two-step model: 
-(1) logistic regression for zero earnings versus positive earnings, and 
-(2) linear regression for level of earnings given earnings are positive. 
-Compare predictions that result from each of these models with each other. 
+
+Exercise 15.7 used a Tobit model to fit a regression with an outcome that had mixed discrete and continuous data. In this exercise you will revisit these data and build a two-step model: (1) logistic regression for zero earnings versus positive earnings, and (2) linear regression for level of earnings given earnings are positive. Compare predictions that result from each of these models with each other.
 
 ```{r}
 ```
