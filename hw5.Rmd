@@ -1,11 +1,8 @@
 ---
 title: "MA678 Homework 5"
-author: "Yuchen Huang"
+author: "Your Name"
 date: "2023-10-20"
-output:
-  html_document:
-    df_print: paged
-  pdf_document: default
+output: pdf_document
 ---
 
 ```{r setup, include=FALSE}
@@ -14,9 +11,6 @@ library(tidyverse)
 library(dtplyr)
 library(rstanarm)
 library(ggplot2)
-library(foreign)
-library(VGAM)
-library(brms)
 #setwd("C:/BU Study/MA678/homework/MA678-HW5")
 #setwd("/Users/baizhizhidou/Desktop/Document/BU_Fall2023/MA678/Homework/HW5")
 ```
@@ -45,6 +39,7 @@ From the posterior predictive check plot, we can see our model predicts less 0s 
 ```{r}
 #Use reisidual plot to see the dispersion
 plot(fitted(m), resid(m), pch = 20, main = "Residual Plot")
+dispersiontest(m)
 ```
 
 From the residual plot, we can see a huge amount of data points are above 0, which indicates that the it is overdispersion. Also, through the dispersion test, the result is 44 which is a large number indicating it's overdispersion.
@@ -64,6 +59,7 @@ We can still observe our model create less 0s than the actual data.
 
 ```{r}
 plot(fitted(m1), resid(m1), pch = 20, main = "Residual Plot")
+dispersiontest(m1)
 ```
 
 From the dispersion test and residual plot, we can see it's still overdispersion since there are many points far away from 0.
@@ -105,9 +101,7 @@ p <- 0.4 + 0.1*(height-72)/3
 n <- round(runif(100, 10, 30))
 y <- rbinom(100, n, p )
 bb <- data.frame(n = n, y = y, height = height)
-m <- stan_glm(cbind(y,n-y) ~ height, family = binomial(link="logit"), data = bb,refresh = 0)
-summary(m)
-pp_check(m)
+
 ```
 
 ### (b)
@@ -115,13 +109,6 @@ pp_check(m)
 Instead of having the true probability of success be linear, have the true probability be a logistic function, set so that Pr(success) = 0.3 for a player who is 5'9" and 0.4 for a 6' tall player.
 
 ```{r}
-p <- invlogit(rstanarm::logit(0.4) + (rstanarm::logit(0.4) - rstanarm::logit(0.3))/3 *(height-72))
-n <- round(runif(100,10,30), 0)
-y <- rbinom(100, n, p)
-new_bb <- data.frame(n,y,height)
-m1 <- stan_glm(cbind(y,n-y) ~ height, family = binomial(link="logit"), data = new_bb, refresh = 0) 
-m1
-pp_check(m1)
 ```
 
 ## 15.7 Tobit model for mixed discrete/continuous data
@@ -129,23 +116,13 @@ pp_check(m1)
 Experimental data from the National Supported Work example are in the folder `Lalonde`. Use the treatment indicator and pre-treatment variables to predict post-treatment (1978) earnings using a Tobit model. Interpret the model coefficients.
 
 ```{r}
-lalonde <- read.dta("NSW_dw_obs.dta")
-m <- vglm(log(re78+1) ~ treat + re75, tobit(Lower = 0, Upper=10), data = lalonde, refresh = 0)
-summary(m)
 ```
-
-As we don't consider the upper and lower bound, when all the predictors are 0, log(re78+1) would be 4.647. If we condier the bounds, when all the predictors are 0, log(re78+1) would be 1.589. Keep other indicator the same, as one unit increase of treat, the log(re78+1) will increase by 0.828. Keep otehr indicator the same, as one unit increase in re75, the log(78+1) will increase by 3.624e-04.
 
 ## 15.8 Robust linear regression using the t model
 
 The folder `Congress` has the votes for the Democratic and Republican candidates in each U.S. congressional district in 1988, along with the parties' vote proportions in 1986 and an indicator for whether the incumbent was running for reelection in 1988. For your analysis, just use the elections that were contested by both parties in both years.
 
 ```{r}
-congress <- read.csv("congress.csv", header = T)
-c1988 <- data.frame(
-    vote=congress$v88_adj,
-    pastvote=congress$v86_adj,
-    inc=congress$inc88)
 ```
 
 ### (a)
@@ -153,9 +130,6 @@ c1988 <- data.frame(
 Fit a linear regression using `stan_glm` with the usual normal-distribution model for the errors predicting 1988 Democratic vote share from the other variables and assess model fit.
 
 ```{r}
-m8 <- stan_glm(vote~pastvote + inc, data = c1988, refresh = 0) 
-summary(m8)
-pp_check(m8)
 ```
 
 ### (b)
@@ -163,16 +137,11 @@ pp_check(m8)
 Fit the same sort of model using the `brms` package with a $t$ distribution, using the `brm` function with the student family. Again assess model fit.
 
 ```{r}
-mb <- brm(vote~pastvote + inc, data = c1988, family = "student", chains = 2, iter = 2000, refresh = 0)
-summary(mb)
-pp_check(mb)
 ```
 
 ### (c)
 
 Which model do you prefer?
-
-I would prefer the student-t model since it fits the real data better than the normal distribution model.
 
 ## 15.9 Robust regression for binary data using the robit model
 
@@ -183,30 +152,18 @@ Use the same data as the previous example with the goal instead of predicting fo
 Fit a standard logistic or probit regression and assess model fit.
 
 ```{r}
-c1988 <- c1988|>
-    mutate(p = ifelse(vote > 0.5, 1, 0))
-mlog <- stan_glm(p~pastvote + inc, data = c1988, family = binomial(link = "logit"), refresh = 0)
-summary(mlog)
-pp_check(mlog)
 ```
-
-The logit model fits well, and it's better than the previous two models.
 
 ### (b)
 
 Fit a robit regression and assess model fit.
 
 ```{r}
-mr <- brm(p~pastvote+inc, data=c1988, family=student(link="logit"))
-summary(mr)
-pp_check(mr)
 ```
 
 ### (c)
 
 Which model do you prefer?
-
-By observing the pp graph, I prefer the logit model.
 
 ## 15.14 Model checking for count data
 
@@ -217,27 +174,6 @@ The folder `RiskyBehavior` contains data from a study of behavior of couples at 
 Fit a Poisson regression predicting number of unprotected sex acts from baseline HIV status. Perform predictive simulation to generate 1000 datasets and record the percentage of observations that are equal to 0 and the percentage that are greater than 10 (the third quartile in the observed data) for each. Compare these to the observed value in the original data.
 
 ```{r}
-mp <- stan_glm(fupacts~bs_hiv, data = risky, family = poisson(link = "log"), refresh = 0)
-summary(mp)
-pp_check(mp)
-```
-
-```{r}
-pp <- posterior_predict(mp, draw = 1000)
-obs_p <- data.frame(
-    num0 = apply(pp, 2, function(x) mean(x==0)),
-    num10 = apply(pp, 2, function(x) mean(x>=10)))
-
-ggplot(data = obs_p, aes(x = num0))+
-    geom_histogram(aes(x = num0))+
-    geom_vline(aes(xintercept=mean(risky$fupacts == 0)), linetype = "dashed")+
-    labs(x = "number of 0s")
-
-ggplot(data = obs_p, aes(x = num10))+
-    geom_histogram(aes(x = num10))+
-    geom_vline(aes(xintercept=mean(risky$fupacts >= 10)), linetype = "dashed")+
-    labs(x = "number of 10s")+
-    xlim(c(0,1))
 ```
 
 ### (b)
@@ -245,9 +181,6 @@ ggplot(data = obs_p, aes(x = num10))+
 Repeat (a) using a negative binomial (overdispersed Poisson) regression.
 
 ```{r}
-mnb <- stan_glm(fupacts~bs_hiv, data = risky, family = neg_binomial_2(link = "log"), refresh = 0)
-summary(mnb)
-pp_check(mnb)
 ```
 
 ### (c)
@@ -255,22 +188,6 @@ pp_check(mnb)
 Repeat (b), also including ethnicity and baseline number of unprotected sex acts as inputs.
 
 ```{r}
-ppc <- posterior_predict(mnb, draw = 1000)
-obs_nb <- data.frame(
-    num0 = apply(ppc, 2, function(x) mean(x==0)),
-    num10 = apply(ppc, 2, function(x) mean(x>=10)))
-
-ggplot(data = obs_nb, aes(x = num0))+
-    geom_histogram(aes(x = num0))+
-    geom_vline(aes(xintercept=mean(risky$fupacts == 0)), linetype = "dashed")+
-    labs(x = "number of 0s")+
-    xlim(c(0,1))
-
-ggplot(data = obs_nb, aes(x = num10))+
-    geom_histogram(aes(x = num10))+
-    geom_vline(aes(xintercept=mean(risky$fupacts >= 10)), linetype = "dashed")+
-    labs(x = "number of 10s")+
-    xlim(c(0,1))
 ```
 
 ## 15.15 Summarizing inferences and predictions using simulation
@@ -278,15 +195,4 @@ ggplot(data = obs_nb, aes(x = num10))+
 Exercise 15.7 used a Tobit model to fit a regression with an outcome that had mixed discrete and continuous data. In this exercise you will revisit these data and build a two-step model: (1) logistic regression for zero earnings versus positive earnings, and (2) linear regression for level of earnings given earnings are positive. Compare predictions that result from each of these models with each other.
 
 ```{r}
-lalonde <- read.dta("NSW_dw_obs.dta")
-lalonde$bin78 <- ifelse(lalonde$re78 > 0, 1, 0)
-m1 = stan_glm(bin78 ~ treat + re75, data = lalonde, family = binomial(link="logit"), refresh = 0)
-pp_check(m1)
 ```
-
-```{r}
-m2 = stan_glm(log(re78) ~ treat + re75, data=lalonde[lalonde$bin78==1,], refresh=0)
-pp_check(m2)
-```
-
-a
